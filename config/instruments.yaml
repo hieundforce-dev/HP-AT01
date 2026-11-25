@@ -1,0 +1,62 @@
+# HP-AT01 bench configuration
+#
+# Resources below are placeholders. Fill them in on the real bench (T16):
+#   - VISA resources: run `python -m visa info` or `hpat bench-check`
+#   - GPIB address : set on the e-load front panel
+#   - FT232H serial: `python -c "import ftd2xx; print(ftd2xx.listDevices())"`
+
+simulation: false
+
+instruments:
+  psu:
+    driver: gwinstek_gpd3303s
+    resource: "ASRL3::INSTR"
+    options:
+      channel: 1
+      max_voltage_v: 32.0
+      max_current_a: 3.0
+
+  eload:
+    driver: eload_3315d
+    resource: "GPIB0::5::INSTR"
+    options:
+      gpib_address: 5
+      max_voltage_v: 120.0
+      max_current_a: 20.0
+      max_power_w: 300.0
+
+  scope:
+    driver: tektronix_tbs2204b
+    resource: "USB0::0x0699::0x0000::C000000::INSTR"
+    options:
+      channels: [1, 2, 3, 4]
+
+  dmm_vin:
+    driver: dmm_ut8805e
+    resource: "USB0::0x1AB1::0x0C94::DM00000000::INSTR"
+    options: {}
+
+  dmm_vout:
+    driver: dmm_keithley2000
+    resource: "USB0::0x05E6::0x2000::0000000::INSTR"
+    options: {}
+
+  dmm_iout:
+    driver: dmm_keithley2100
+    resource: "USB0::0x05E6::0x2100::0000000::INSTR"
+    options:
+      shunt_ohm: 0.01
+
+  ft232h:
+    driver: ft232h
+    resource: "FT232H-A"
+    options:
+      i2c_frequency_hz: 100000
+
+safety:
+  max_voltage_v: 12.0
+  max_current_a: 20.0
+  max_power_w: 240.0
+  settle_ms_default: 200
+  power_up_order: [psu, eload]
+  power_down_order: [eload, psu]
