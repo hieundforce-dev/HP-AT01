@@ -1,6 +1,6 @@
 # Keithley Model 2100 Calibration SCPI Command Reference
 
-> **Source restriction:** Prepared only from the supplied `Keithley_2100-user-manual.pdf`, which is actually the *Model 2100 6 1/2-Digit Resolution Digital Multimeter Calibration Manual*, document 2100-905-01 Rev. C, March 2021. No commands were added from the separate Model 2100 User's Manual or any external source.
+> **Source restriction:** Prepared only from the supplied `instruments\raw\Keithley_2100-user-manual.pdf`, which is actually the *Model 2100 6 1/2-Digit Resolution Digital Multimeter Calibration Manual*, document 2100-905-01 Rev. C, March 2021. No commands were added from the separate Model 2100 User's Manual or any external source.
 
 ## 1. Introduction
 
