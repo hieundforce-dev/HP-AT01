@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from hpat.cli import app
+from hpat.drivers import ft232h_driver
+from hpat.drivers.ft232h_mpsse import MpsseError
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -12,12 +15,12 @@ runner = CliRunner()
 CONFIG = """
 instruments:
   psu: {driver: gwinstek_gpd3303s, resource: "ASRL3::INSTR"}
-  eload: {driver: eload_3315d, resource: "GPIB0::5::INSTR"}
+  eload: {driver: prodigit_3315g, resource: "GPIB0::5::INSTR"}
   scope: {driver: tektronix_tbs2204b, resource: "USB0::0x0699::0x0000::C000000::INSTR"}
   ft232h: {driver: ft232h, resource: "FT232H-A"}
 safety:
   max_voltage_v: 12.0
-  max_current_a: 20.0
+  max_current_a: 15.0
 """
 
 
@@ -35,7 +38,13 @@ def test_bench_check_sim_all_ok(tmp_path: Path) -> None:
     assert "All 4 instruments OK." in result.output
 
 
-def test_bench_check_real_mode_fails_until_drivers_exist(tmp_path: Path) -> None:
+def test_bench_check_real_mode_fails_until_drivers_exist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(**_kwargs: object) -> None:
+        raise MpsseError("FT232H: D2XX library not available")
+
+    monkeypatch.setattr(ft232h_driver, "open_ft232h", fail)
     result = runner.invoke(app, ["bench-check", "--config", str(write_config(tmp_path))])
 
     assert result.exit_code == 1

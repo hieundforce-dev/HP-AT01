@@ -97,9 +97,9 @@ class SimPsu(SimInstrument):
 
 
 class SimEload(SimInstrument):
-    """3315D electronic load: CC/CV/CR/CP mode, setpoint, input on/off."""
+    """Prodigit 3315G electronic load: CC/CV/CR/CP, setpoint, input on/off."""
 
-    model = "3315D,DC ELECTRONIC LOAD"
+    model = "PRODIGIT,3315G"
 
     def __init__(self, role: str, config: Any) -> None:
         super().__init__(role, config)

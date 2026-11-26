@@ -10,6 +10,7 @@ from __future__ import annotations
 from hpat.core.config import InstrumentConfig
 from hpat.core.errors import InstrumentError
 from hpat.drivers.base import Instrument
+from hpat.drivers.ft232h_driver import Ft232hDriver
 from hpat.drivers.sim.instruments import (
     SimEload,
     SimFt232h,
@@ -22,7 +23,7 @@ from hpat.drivers.sim.instruments import (
 
 SIM_DRIVERS: dict[str, type[Instrument]] = {
     "gwinstek_gpd3303s": SimPsu,
-    "eload_3315d": SimEload,
+    "prodigit_3315g": SimEload,
     "tektronix_tbs2204b": SimScope,
     "dmm_ut8805e": SimUt8805E,
     "dmm_keithley2000": SimKeithley2000,
@@ -30,8 +31,10 @@ SIM_DRIVERS: dict[str, type[Instrument]] = {
     "ft232h": SimFt232h,
 }
 
-#: Filled in by later tasks (T04, T07, T08, T09).
-REAL_DRIVERS: dict[str, type[Instrument]] = {}
+#: Filled in by later tasks (T07, T08, T09).
+REAL_DRIVERS: dict[str, type[Instrument]] = {
+    "ft232h": Ft232hDriver,
+}
 
 
 def create_instrument(

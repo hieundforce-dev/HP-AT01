@@ -27,7 +27,7 @@ oscilloscope, DMM và ghi/đọc register qua FT232H. Hệ quả:
 | PMIC model | Cập nhật sau (không hard-code) |
 | Số rail | 1–7 |
 | Vout | 0.5 V – 12 V |
-| Iout | 1 A – 20 A mỗi rail |
+| Iout | 1 A – 15 A mỗi rail (giới hạn module e-load 3315G) |
 | Điều khiển | I2C + GPIO qua FT232H |
 
 ## Tính năng
@@ -81,20 +81,24 @@ oscilloscope, DMM và ghi/đọc register qua FT232H. Hệ quả:
 | Loại | Nội dung |
 |---|---|
 | Nền tảng | Windows 11, Python 3.12, `.venv` + pip, có internet |
-| PSU | GW Instek GPD-3303S (USB) |
-| E-load | 3315D DC Electronic Load (GPIB qua NI GPIB-USB-HS) |
-| Oscilloscope | Tektronix TBS2204B (4 kênh) |
-| DMM | UNI-T UT8805E / Keithley 2000 / Keithley 2100 (USB, PyVISA) |
+| PSU | GW Instek GPD-3303S (USB, 9600 baud): CH1/CH2 0–30 V / 3 A, CH3 cố định; chỉ **2 kênh lập trình** |
+| E-load | Prodigit **3315G** trong mainframe **3302G** (GPIB qua NI GPIB-USB-HS): 15 A / 60 V / 75 W |
+| Oscilloscope | Tektronix TBS2204B (4 kênh, TBS2000B series) |
+| DMM | UNI-T UT8805E (đủ tài liệu đo); Keithley 2100 (⚠️ tài liệu hiện có chỉ là calibration manual) |
 | I2C/GPIO | FT232H (ftd2xx / D2XX driver, MPSSE) |
 | Thời gian | Không giới hạn cứng; ưu tiên bản chạy được trên bench sớm |
 
 ## Rủi ro & câu hỏi mở
 
-1. **Công suất PSU:** GPD-3303S chỉ 3 A / 32 V mỗi kênh. **Đã chốt:** nếu plan yêu cầu dòng vào
-   > 3 A thì kẹp ở 3 A, in cảnh báo và ghi vào `notes` của kết quả (không fail case). Khi có PSU
-   công suất cao hơn thì chỉ cần sửa `max_current` trong `config/instruments.yaml`.
-2. **FT232H không có ADC:** đo analog dùng DMM (đã chốt), FT232H chỉ I2C/GPIO qua `ftd2xx`.
-3. **SCPI command set** của 3315D và GPD-3303S cần manual để hoàn thiện driver; kiến trúc dùng
-   **command map trong config** để có thể chỉnh không sửa code.
-4. Địa chỉ GPIB của e-load, resource VISA của từng máy: điền vào `config/instruments.yaml` khi có bench.
-5. **FT232H D2XX:** cần driver D2XX (CDM) và phải gỡ VCP cho thiết bị đó; I2C phải tự cài trên MPSSE.
+1. **Công suất PSU:** GPD-3303S chỉ 3 A / 30 V mỗi kênh (không phải 32 V). **Đã chốt:** nếu plan
+   yêu cầu dòng vào > 3 A thì kẹp ở 3 A, in cảnh báo và ghi vào `notes` của kết quả (không fail case).
+2. **Giới hạn e-load 3315G:** 15 A / 60 V / **75 W**. Dòng khả dụng phụ thuộc Vout
+   (ví dụ 12 V → tối đa 6,25 A; 5 V → 15 A). Phải validate cả P = V × I trước khi chạy.
+3. **Chỉ 2 kênh PSU lập trình được:** test sequencing (T14) tối đa **2 rail** cùng lúc.
+   Không có PSU thứ 2 trong phạm vi dự án.
+4. **FT232H không có ADC:** đo analog dùng DMM (đã chốt), FT232H chỉ I2C/GPIO qua `ftd2xx`.
+5. **Nguồn SCPI:** chỉ dùng `docs/instruments/processed/` (không đọc `raw/`, không dùng nguồn ngoài).
+   Manual Keithley 2100 hiện có là **calibration manual** → chưa có lệnh đo cho K2100; các role đo
+   tạm dùng UT8805E.
+6. Địa chỉ GPIB của e-load, resource VISA của từng máy: điền vào `config/instruments.yaml` khi có bench.
+7. **FT232H D2XX:** cần driver D2XX (CDM) và phải gỡ VCP cho thiết bị đó; I2C phải tự cài trên MPSSE.

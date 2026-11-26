@@ -4,9 +4,14 @@
 
 ## Trạng thái hiện tại
 
-- **T03 hoàn thành.** `hpat bench-check --sim` báo OK 7/7 role; driver base có retry + log SCPI.
-- Đang chờ bắt đầu **T04 — FT232H: I2C + GPIO (ftd2xx/MPSSE)**.
+- **T04 hoàn thành (code + unit test).** FT232H I2C/GPIO qua `ftd2xx` + MPSSE; 65 test pass;
+  `bench-check --sim` 7/7 OK; `bench-check` thật báo lỗi D2XX rõ ràng.
+- **Đã review PR #1 (doc_upgrade)**: 7 file SCPI processed + 5 PDF; không đổi code.
+- Đã đồng bộ tài liệu với phần cứng thực: e-load **Prodigit 3315G** (15 A/60 V/75 W),
+  PSU **30 V/3 A**, chỉ 2 kênh lập trình, Keithley 2100 thiếu lệnh đo.
+- **Tiếp theo: T05 — Plugin framework + runner + results.**
 - `run` vẫn dừng ở "not implemented (T05)" sau preflight; `sim`/`validate` chưa làm.
+- ⏳ Chưa có FT232H trên máy dev → scan bus thật kiểm tra ở T16.
 
 ## Đã hoàn thành
 
@@ -25,19 +30,28 @@
   Thêm dependency `pyyaml` (cần cho YAML config).
 - **T03:** `hpat/drivers/{base,registry}.py`, `hpat/drivers/sim/`, `hpat/core/bench.py`;
   `bench-check` in bảng trạng thái, exit code 0/1; 43 test pass.
+- **T04:** `hpat/drivers/ft232h_{mpsse,i2c,gpio,driver}.py`; `Ft232hDriver` đăng ký trong
+  `REAL_DRIVERS`; I2C 7-bit + register 8-bit, multi-byte, repeated START, ACK/NACK, scan,
+  clock stretching (tuỳ chọn), GPIO ACBUS0-7 (input mặc định); fake-transport unit tests;
+  `THIRD_PARTY_NOTICES.md` (MIT, `ftdi_mpsse_python`); 65 test pass.
 - **Tài liệu:** `docs/USER_MANUAL.md` (cài đặt, cấu hình, lệnh, output, an toàn, xử lý sự cố).
+- **Review PR #1:** chuẩn hoá tên file processed (`gwinstek_gpd3303s.md`, `prodigit_3315g.md`,
+  `tektronix_tbs2000b.md`, `unit_ut8805e.md`, `keithley_2100.md`…); `processed/` là nguồn SCPI
+  duy nhất; cập nhật PRD/ARCHITECTURE/TASKS/config theo phần cứng thực.
 
 ## Lỗi / Blocker
 
 1. ~~PSU GPD-3303S chỉ 3 A/kênh~~ → **đã chốt:** kẹp 3 A, WARN, ghi `notes` (ADR-12).
-2. ~~FT232H dùng pyftdi/libusb~~ → **đã chốt:** dùng `ftd2xx` (D2XX) + MPSSE tự viết (ADR-11).
-3. Chưa có SCPI manual của e-load 3315D và PSU GPD-3303S → driver dùng command map YAML,
-   hoàn thiện khi có tài liệu trong `docs/instruments/raw/`.
-4. Chưa có resource VISA / GPIB address thực tế của bench → điền vào `config/instruments.yaml` ở T16.
+2. ~~FT232H dùng pyftdi/libusb~~ → **đã chốt:** dùng `ftd2xx` (D2XX) + MPSSE, sample `ftdi_mpsse_python` (ADR-11).
+3. ~~Thiếu tài liệu SCPI~~ → **đã có** trong `docs/instruments/processed/`; **không đọc `raw/`**.
+4. **Keithley 2100**: tài liệu hiện có là calibration manual, không có lệnh đo → role đo dùng UT8805E.
+5. **E-load 3315G giới hạn 75 W**: dòng khả dụng phụ thuộc Vout (12 V → 6,25 A) → validate cả P.
+6. **Chỉ 2 kênh PSU**: sequencing tối đa 2 rail; không có PSU thứ 2.
+7. Chưa có resource VISA / GPIB address thực tế của bench → điền vào `config/instruments.yaml` ở T16.
 
 ## Bước tiếp theo
 
-- Làm **T04 — FT232H: I2C + GPIO (ftd2xx/MPSSE)**.
+- Làm **T05 — Plugin framework + runner + results**.
 
 ## Ghi chú môi trường
 
@@ -58,3 +72,5 @@
 | 2026-11-25 | T02 | Config pydantic + `instruments.yaml`, logging file, run folder, 23 test pass |
 | 2026-11-25 | T03 | Driver base (retry + SCPI log), 7 sim driver, `bench-check`, 43 test pass |
 | 2026-11-25 | — | Thêm `docs/USER_MANUAL.md` |
+| 2026-11-26 | — | Review PR #1: chuẩn hoá docs SCPI, chốt 3315G/75 W, PSU 2 kênh, nguồn SCPI = `processed/` |
+| 2026-11-26 | T04 | FT232H MPSSE: I2C (ACK/scan/clock stretching) + GPIO ACBUS, 65 test pass |

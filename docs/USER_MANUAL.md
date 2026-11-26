@@ -14,13 +14,13 @@ Tài liệu kỹ thuật nội bộ: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DES
 
 ## 2. Trạng thái phiên bản
 
-Bản hiện tại đã xong T01–T03 (xem [`TASKS.md`](TASKS.md)).
+Bản hiện tại đã xong T01–T04 (xem [`TASKS.md`](TASKS.md)).
 
 | Lệnh | Trạng thái |
 |---|---|
 | `hpat --help`, `--version` | ✅ hoạt động |
 | `hpat list-tests` | ✅ hoạt động (chưa có test item nào) |
-| `hpat bench-check [--sim]` | ✅ hoạt động (driver thật sẽ có ở T07–T09) |
+| `hpat bench-check [--sim]` | ✅ hoạt động (FT232H thật đã có; PSU/e-load/scope/DMM ở T07–T09) |
 | `hpat run <plan.csv>` | ⚠️ mới chạy **preflight** (kiểm config + tạo run folder), chưa đo |
 | `hpat sim <plan.csv>` | ⏳ chưa triển khai (T05) |
 | `hpat validate <plan.csv>` | ⏳ chưa triển khai (T05) |
@@ -99,13 +99,14 @@ instruments:
     resource: "ASRL3::INSTR"      # COM3 nếu dùng cổng ảo
     options:
       channel: 1
-      max_voltage_v: 32.0
-      max_current_a: 3.0
+      baud_rate: 9600
+      max_voltage_v: 30.0         # CH1/CH2: 0-30 V
+      max_current_a: 3.0          # CH1/CH2: 3 A
 
   eload:
-    driver: eload_3315d
+    driver: prodigit_3315g
     resource: "GPIB0::5::INSTR"   # địa chỉ GPIB đặt trên mặt máy
-    options: {gpib_address: 5, max_current_a: 20.0}
+    options: {module: 3315G, gpib_address: 5, max_current_a: 15.0, max_power_w: 75.0}
 
   scope:
     driver: tektronix_tbs2204b
@@ -117,12 +118,18 @@ instruments:
 
   ft232h:
     driver: ft232h
-    resource: "FT232H-A"
+    resource: "FT232H-A"        # nhãn; chọn thiết bị bằng options bên dưới
+    options:
+      serial: ""                # serial D2XX; rỗng = dùng index
+      index: 0
+      i2c_frequency_hz: 100000
+      clock_stretching: false   # true: bật adaptive clocking (xem mục FT232H)
+      timeout_s: 2.0
 
 safety:
   max_voltage_v: 12.0
-  max_current_a: 20.0
-  max_power_w: 240.0
+  max_current_a: 15.0
+  max_power_w: 75.0
   settle_ms_default: 200
   power_up_order: [psu, eload]
   power_down_order: [eload, psu]
@@ -160,9 +167,58 @@ Error: Invalid config 'config/instruments.yaml':
   - safety.max_voltage_v: Input should be greater than 0
 ```
 
-## 6. Sử dụng
+## 6. FT232H — đấu dây và sử dụng
 
-### 6.1 Kiểm tra kết nối bench
+### 6.1 Cài driver D2XX
+
+1. Cài **FTDI D2XX driver (CDM)** cho Windows 11 (bản có `libftd2xx`/`ftd2xx.dll`).
+2. Trong Device Manager, **gỡ VCP** (Virtual COM Port) khỏi FT232H — D2XX và VCP
+   không bind cùng lúc.
+3. Kiểm tra:
+
+   ```powershell
+   python -c "import ftd2xx; print(ftd2xx.listDevices())"
+   ```
+
+   Không có thiết bị → kiểm tra cáp USB và driver. Lỗi `libftd2xx` → cài D2XX.
+
+### 6.2 Đấu dây I2C
+
+| FT232H | Nối tới | Ghi chú |
+|---|---|---|
+| ADBUS0 | SCL | cần pull-up 2.2k–10k lên 3.3 V |
+| ADBUS1 | SDA | **nối chung với ADBUS2** tại chân SDA của DUT |
+| ADBUS2 | SDA | đường đọc SDA (TDO) |
+| GND | GND | mass chung với DUT |
+
+ADBUS1 và ADBUS2 **phải nối với nhau** ở phía DUT (ADBUS1 phát, ADBUS2 đọc).
+Đường SCL/SDA dùng open-drain (Drive-Zero) nên **bắt buộc có pull-up**.
+
+GPIO dùng **ACBUS0–ACBUS7** (8 chân), mặc định là input; `set_gpio(pin, level)`
+tự chuyển chân thành output. `pin` = 0–7 tương ứng ACBUS0–7.
+
+### 6.3 API driver
+
+```python
+ft = bench.instrument("ft232h")       # Ft232hDriver
+ft.i2c_write(0x50, 0x10, 0xAB)        # 7-bit address, 8-bit register
+value = ft.i2c_read(0x50, 0x10)       # -> int
+ft.i2c_write_bytes(0x50, 0x10, [0x01, 0x02])
+data = ft.i2c_read_bytes(0x50, 0x10, 2)
+found = ft.i2c_scan()                 # [0x20, 0x50, ...]
+ft.set_gpio(0, True)                  # ACBUS0 = high
+level = ft.read_gpio(0)               # -> bool
+```
+
+### 6.4 Clock stretching
+
+Đặt `clock_stretching: true` để bật adaptive clocking của MPSSE. Chỉ dùng khi
+DUT thực sự kéo SCL; nếu đấu dây sai, MPSSE có thể chờ SCL mãi và giao dịch bị
+timeout. Mặc định tắt.
+
+## 7. Sử dụng
+
+### 7.1 Kiểm tra kết nối bench
 
 ```powershell
 hpat bench-check --sim                 # dùng thiết bị giả lập
@@ -173,7 +229,7 @@ hpat bench-check --verbose             # kèm log SCPI
 Kết quả: bảng `Role / Driver / Resource / Status / Detail`.
 Exit code `0` nếu tất cả OK, `1` nếu có thiết bị lỗi.
 
-### 6.2 Chạy test
+### 7.2 Chạy test
 
 ```powershell
 hpat run <plan.csv> --config config\instruments.yaml --dut-sn SN12345
@@ -188,7 +244,7 @@ Hiện tại lệnh này:
 
 Khi các task sau hoàn thành, bước 4 sẽ được thay bằng chạy test thật.
 
-### 6.3 Các lệnh khác
+### 7.3 Các lệnh khác
 
 ```powershell
 hpat list-tests                        # danh sách test item + cột CSV
@@ -196,7 +252,7 @@ hpat validate <plan.csv>               # kiểm tra plan (T05)
 hpat sim <plan.csv>                    # chạy trên bench giả lập (T05)
 ```
 
-### 6.4 Exit code
+### 7.4 Exit code
 
 | Code | Ý nghĩa |
 |---|---|
@@ -204,7 +260,7 @@ hpat sim <plan.csv>                    # chạy trên bench giả lập (T05)
 | 1 | Lỗi config / thiết bị / plan |
 | 2 | Chức năng chưa được triển khai |
 
-## 7. Output của một lần chạy
+## 8. Output của một lần chạy
 
 ```text
 runs/2026-11-25_143012_efficiency_buck1_SN12345/
@@ -218,7 +274,7 @@ runs/2026-11-25_143012_efficiency_buck1_SN12345/
 - Giá trị đo **không làm tròn**; đơn vị ở cột `unit`.
 - Log: `HH:MM:SS.mmm LEVEL module — message`; `--verbose` thêm SCPI TX/RX.
 
-## 8. Test plan CSV (dự kiến)
+## 9. Test plan CSV (dự kiến)
 
 Mỗi test item có format riêng. Ví dụ efficiency (sẽ chốt ở T10):
 
@@ -231,15 +287,16 @@ EFF_BUCK1,1,BUCK1,12.0,0.5,3.0,0.5,2,200,85.0,,%,0x21=0x1F
 - `limit_min` / `limit_max`: spec để đánh giá PASS/FAIL.
 - `register_writes`: ghi I2C trước khi đo, ví dụ `0x21=0x1F;0x22=0x0A`.
 
-## 9. An toàn khi vận hành
+## 10. An toàn khi vận hành
 
 1. Luôn set current limit trước khi bật output.
 2. Output PSU và e-load luôn được tắt trong `finally` (kể cả Ctrl+C).
 3. Nếu dòng vào yêu cầu > 3 A (giới hạn GPD-3303S): phần mềm **kẹp ở 3 A**,
    in WARN và ghi `notes` vào CSV. Không tự nâng limit.
-4. Không sửa kết quả hoặc limit để test "pass".
+4. E-load 3315G: kiểm tra cả **15 A**, **60 V** và **75 W** (P = V × I) trước khi bật.
+5. Không sửa kết quả hoặc limit để test "pass".
 
-## 10. Xử lý sự cố
+## 11. Xử lý sự cố
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
@@ -248,12 +305,13 @@ EFF_BUCK1,1,BUCK1,12.0,0.5,3.0,0.5,2,200,85.0,,%,0x21=0x1F
 | `unknown instrument roles` | Gõ sai tên role | Dùng đúng tên trong bảng role |
 | `no real implementation yet` | Driver thật chưa có (T03) | Dùng `--sim`, hoặc chờ T07–T09 |
 | `cannot open VISA resource` | Sai resource, thiếu NI-VISA, thiết bị đang bận | Kiểm tra NI MAX, đóng phần mềm khác |
+| Keithley 2100 không đo được | Tài liệu hiện có chỉ là calibration manual | Dùng UT8805E cho role đo; bổ sung manual |
 | GPIB không thấy | Thiếu NI-488.2 / sai địa chỉ | Cài NI-488.2, kiểm tra address trên e-load |
 | FT232H lỗi mở | Chưa cài D2XX hoặc còn VCP | Cài D2XX, gỡ VCP cho thiết bị |
 | `No module named hpat` | Chưa `pip install -e .` và không đứng ở thư mục project | Cài editable hoặc `cd` vào project |
 | `No module named pyvisa` | Chưa cài requirements | `pip install -r requirements.txt` |
 
-## 11. Phát triển
+## 12. Phát triển
 
 ```powershell
 pytest
@@ -263,10 +321,15 @@ ruff format .
 
 Quy ước code: xem [`RULES.md`](RULES.md). Tiến độ: [`PROGRESS.md`](PROGRESS.md).
 
-## 12. Giới hạn hiện tại
+## 13. Giới hạn hiện tại
 
 - Chưa đo thật: `run`/`sim`/`validate` sẽ hoàn thiện ở T05–T15.
 - Chưa có test item nào được đăng ký.
-- Driver thật (PSU, e-load, scope, DMM, FT232H) ở T04, T07–T09.
-- Tài liệu SCPI gốc đặt trong [`instruments/raw/`](instruments/raw/), bản đã xử lý trong
-  [`instruments/processed/`](instruments/processed/).
+- Driver thật: FT232H đã có (T04); PSU, e-load, scope, DMM ở T07–T09.
+- FT232H: chỉ hỗ trợ I2C 7-bit + register 8-bit; chưa có 10-bit/SMBus PEC.
+  Clock stretching phải bật thủ công và phụ thuộc đấu dây.
+- Giới hạn phần cứng: PSU 30 V/3 A × 2 kênh (sequencing tối đa 2 rail);
+  e-load 3315G 15 A/60 V/75 W.
+- Keithley 2100: tài liệu hiện có chỉ có lệnh calibration → chưa dùng để đo.
+- Nguồn SCPI chuẩn: [`instruments/processed/`](instruments/processed/);
+  `instruments/raw/` chỉ để lưu trữ PDF gốc.

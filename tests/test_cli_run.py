@@ -12,7 +12,7 @@ runner = CliRunner()
 VALID_CONFIG = """
 instruments:
   psu: {driver: gwinstek_gpd3303s, resource: "ASRL3::INSTR"}
-  eload: {driver: eload_3315d, resource: "GPIB0::5::INSTR"}
+  eload: {driver: prodigit_3315g, resource: "GPIB0::5::INSTR"}
   scope: {driver: tektronix_tbs2204b, resource: "USB0::0x0699::0x0000::C000000::INSTR"}
   ft232h: {driver: ft232h, resource: "FT232H-A"}
 safety:

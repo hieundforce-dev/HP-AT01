@@ -37,13 +37,14 @@ HP-AT01/
 │   ├── drivers/
 │   │   ├── base.py              # VisaInstrument: query/write, retry, log SCPI
 │   │   ├── gwinstek_gpd3303s.py
-│   │   ├── eload_3315d.py       # SCPI command map từ config
+│   │   ├── prodigit_3315g.py       # SCPI command map từ config
 │   │   ├── tektronix_tbs2204b.py
 │   │   ├── dmm_ut8805e.py
 │   │   ├── dmm_keithley2000.py  # dùng chung cho K2000/K2100
-│   │   ├── ft232h_mpsse.py       # MPSSE engine (clock, bit-bang) trên ftd2xx
-│   │   ├── ft232h_i2c.py        # I2C master: start/stop/address/read/write ACK
-│   │   ├── ft232h_gpio.py
+│   │   ├── ft232h_mpsse.py       # MPSSE transport + opcodes, mở D2XX, clock divisor
+│   │   ├── ft232h_i2c.py         # I2C master: start/stop/address/read/write ACK, scan
+│   │   ├── ft232h_gpio.py        # GPIO ACBUS0-7 (input mặc định)
+│   │   ├── ft232h_driver.py      # Ft232hDriver (Instrument): I2C + GPIO API
 │   │   └── sim/                 # thiết bị giả lập (deterministic)
 │   ├── tests/                   # plugin test item
 │   │   ├── efficiency.py
@@ -135,22 +136,24 @@ class BaseTest(ABC):
 | ADR-02 | Output lõi dùng chung cột chuẩn + cột riêng từng test | Đủ để gộp/so sánh, vẫn linh hoạt |
 | ADR-03 | Không DB, chỉ `runs/<timestamp>/` | Đơn giản, dễ copy/share log; SQLite để sau nếu cần |
 | ADR-04 | Waveform lấy bằng SCPI (`CURVe?` + preamble) rồi vẽ matplotlib | Ảnh có tiêu đề/limit/annotation theo chuẩn chung, không phụ thuộc screenshot scope |
-| ADR-05 | SCPI command map đặt trong YAML | 3315D/GPD chưa có manual đầy đủ; đổi lệnh không cần sửa code |
+| ADR-05 | SCPI command map đặt trong YAML; nguồn lệnh là `docs/instruments/processed/` | Tài liệu đã được chuẩn hoá kèm page ref; đổi lệnh không cần sửa code; không dùng `raw/` |
 | ADR-06 | Sim driver song song với driver thật | Code/test được toàn bộ pipeline khi không có bench; CI chạy được |
 | ADR-07 | Đo analog bằng DMM, không dùng FT232H | FT232H không có ADC |
 | ADR-08 | Safety layer trong `Bench` (context manager + finally) | Không thể để output bật khi crash |
 | ADR-09 | Chạy tuần tự, 1 tiến trình | Tránh tranh chấp VISA/GPIB; đủ nhanh cho quy mô 7 rail |
 | ADR-10 | Log stdlib, không loguru | Giảm dependency, đủ nhu cầu |
-| ADR-11 | FT232H dùng **ftd2xx (D2XX)** + MPSSE tự viết, không dùng pyftdi/libusb | Yêu cầu dự án; tránh Zadig/WinUSB; đổi lại phải tự cài đặt I2C master trên MPSSE |
+| ADR-11 | FT232H dùng **ftd2xx (D2XX)** + MPSSE, tham khảo sample `ftdi_mpsse_python` (MIT) | Yêu cầu dự án; sample đã chạy được trên bench; tránh Zadig/WinUSB. Sample không còn maintain → adapt có attribution, không phụ thuộc trực tiếp |
 | ADR-12 | Dòng vào PSU vượt 3 A → **kẹp ở 3 A**, chạy tiếp + cảnh báo, không fail case | GPD-3303S giới hạn 3 A/kênh; vẫn thu được dữ liệu, ghi rõ trong kết quả để không hiểu nhầm |
+| ADR-13 | Giới hạn e-load lấy từ config theo module (3315G: 15 A/75 W) | Cho phép thay module 3311G (60 A/300 W) sau này mà không sửa code |
 
 ## Rủi ro kỹ thuật
 
 | Rủi ro | Ảnh hưởng | Giảm thiểu |
 |---|---|---|
-| GPD-3303S chỉ 3 A/kênh | Không test được rail 20 A | Validate `Iset` theo `max_current` trong config; cảnh báo rõ; chờ PSU mới |
+| GPD-3303S chỉ 3 A/kênh | Không test được rail > 3 A dòng vào | Kẹp 3 A, WARN trên console, ghi `notes` trong CSV |
+| E-load 3315G giới hạn 75 W | Không đạt 15 A ở Vout cao | Validate P = V × I; báo lỗi rõ trước khi chạy |
+| Chỉ 2 kênh PSU | Sequencing tối đa 2 rail | Giới hạn trong plan T14; ghi rõ trong tài liệu |
+| Keithley 2100 thiếu lệnh đo | Không dùng được K2100 để đo | Dùng UT8805E cho role đo; bổ sung manual khi có |
 | FT232H cần driver D2XX | VCP và D2XX không bind cùng lúc | README hướng dẫn cài D2XX (CDM) và gỡ VCP cho thiết bị; `bench-check` báo lỗi rõ |
-| PSU 3 A/kênh | Không đạt dòng vào yêu cầu | Kẹp 3 A, WARN trên console, ghi `notes` trong CSV |
-| SCPI 3315D chưa rõ | Driver sai lệnh | Command map YAML + sim test trước |
 | GPIB NI-VISA | Resource string khác nhau | `bench-check` liệt kê resource; config hoá |
 | Scope 4 kênh, nhiều rail | Thiếu kênh đo đồng thời | Giới hạn số tín hiệu/1 lần chạy; ghi rõ trong plan |

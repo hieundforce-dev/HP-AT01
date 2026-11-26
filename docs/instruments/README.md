@@ -1,33 +1,45 @@
 # Tài liệu thiết bị & tập lệnh
 
-Thư mục này chứa tài liệu điều khiển thiết bị (SCPI, register map, protocol) dùng cho driver
-trong `hpat/drivers/`.
+Thư mục này chứa tài liệu điều khiển thiết bị dùng cho driver trong `hpat/drivers/`.
 
 ```text
 docs/instruments/
-├── raw/         # Tài liệu gốc: PDF datasheet, programming manual, register map, ảnh chụp
-└── processed/   # Tài liệu đã xử lý: Markdown tóm tắt lệnh, bảng command map, ghi chú
+├── ate_scpi_command_extraction.md   # quy tắc đọc/tách SCPI (bắt buộc tuân thủ)
+├── raw/                             # PDF gốc — chỉ lưu trữ
+└── processed/                       # NGUỒN CHUẨN cho mọi lệnh SCPI
 ```
 
-## Quy ước
+## Quy tắc nguồn (bắt buộc)
 
-- **`raw/`**: giữ nguyên file gốc, không sửa. Đặt tên `<hang>_<model>_<loai>.<ext>`,
-  ví dụ `gwinstek_gpd3303s_programming.pdf`, `tektronix_tbs2000b_scpi.pdf`.
-- **`processed/`**: mỗi thiết bị 1 file Markdown `<hang>_<model>.md`, gồm:
-  1. Thông tin kết nối (USB/LAN/GPIB, resource VISA mẫu, baud, GPIB address).
-  2. Bảng lệnh dùng trong project (chức năng → lệnh → phản hồi → ghi chú).
-  3. Giới hạn an toàn (Vmax, Imax, Pmáx, thời gian settle khuyến nghị).
-  4. Lệnh không dùng / cấm.
-- Khi `raw/` được cập nhật, cập nhật lại file tương ứng trong `processed/`.
-- Không đưa thông tin nhạy cảm (serial number thật, mật khẩu) vào tài liệu.
+1. **`processed/` là nguồn chuẩn duy nhất** khi viết driver. Mọi lệnh dùng trong code phải có
+   trong file tương ứng, kèm page reference.
+2. **Không đọc `raw/` để lấy lệnh SCPI.** `raw/` chỉ là bản lưu PDF gốc để đối chiếu khi cần.
+3. Không dùng nguồn ngoài (internet, manual hãng khác) — theo
+   [`ate_scpi_command_extraction.md`](ate_scpi_command_extraction.md).
+4. Lệnh chưa có trong `processed/` → **không được tự bịa**; dừng lại, yêu cầu bổ sung tài liệu.
+5. Cập nhật `processed/` khi có manual mới, giữ nguyên định dạng mục 1–3 của quy tắc.
+
+## Đặt tên
+
+`processed/<hang>_<model>.md` (snake_case), ví dụ `prodigit_3315g.md`.
+
+| File | Thiết bị |
+|---|---|
+| `gwinstek_gpd3303s.md` | PSU GW Instek GPD-3303S |
+| `prodigit_3315g.md` | E-load Prodigit 3315G (mainframe 3302G) |
+| `prodigit_3311g.md` | E-load Prodigit 3311G (tham khảo, chưa dùng) |
+| `tektronix_tbs2000b.md` | Oscilloscope Tektronix TBS2000B series |
+| `unit_ut8805e.md` | DMM UNI-T UT8805E |
+| `keithley_2100.md` | DMM Keithley 2100 (⚠️ manual hiện có chỉ là **calibration manual**) |
+| `ft232_i2c_mpsse_sample.md` | Ghi chú sample I2C/MPSSE (ftd2xx) |
 
 ## Thiết bị của dự án
 
-| Thiết bị | Model | Kết nối | Tài liệu cần |
+| Thiết bị | Model | Kết nối | Giới hạn chính |
 |---|---|---|---|
-| PSU | GW Instek GPD-3303S | USB | Programming manual, giới hạn 3 A/kênh |
-| E-load | 3315D DC Electronic Load | GPIB (NI GPIB-USB-HS) | SCPI command set, chế độ CC/CV/CR/CP, dynamic |
-| Oscilloscope | Tektronix TBS2204B | USB/LAN | SCPI waveform (`WFMPre?`, `CURVe?`), trigger, đo tự động |
-| DMM | UNI-T UT8805E | USB | SCPI đo DCV/DCI, range, NPLC |
-| DMM | Keithley 2000 / 2100 | USB | SCPI đo DCV/DCI, range, NPLC |
-| I2C/GPIO | FT232H | USB (D2XX driver) | Không cần manual; I2C/GPIO qua `ftd2xx` + MPSSE |
+| PSU | GW Instek GPD-3303S | USB (virtual COM, 9600) | CH1/CH2: 0–30 V / 3 A; CH3 cố định; `OUT1/OUT0` bật/tắt **toàn bộ** output; `TRACK0/1/2` |
+| E-load | Prodigit **3315G** trong mainframe 3302G | GPIB (NI GPIB-USB-HS) | **15 A / 60 V / 75 W**; CC/CV/CR/CP; có dynamic, OCP/OPP |
+| Oscilloscope | Tektronix TBS2204B (TBS2000B series) | USB/LAN | 4 kênh; `CURVe?` + `WFMOutpre` để lấy waveform |
+| DMM | UNI-T UT8805E | USB | Có `MEASure:VOLT/CURR`; manual không nêu chi tiết interface |
+| DMM | Keithley 2100 | USB | ⚠️ tài liệu hiện tại chỉ có lệnh calibration/configuration, **không có lệnh đo** |
+| I2C/GPIO | FT232H | USB (D2XX driver) | Dùng `ftd2xx` + MPSSE; sample tham khảo `ftdi_mpsse_python` (MIT) |

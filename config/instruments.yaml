@@ -4,6 +4,8 @@
 #   - VISA resources: run `python -m visa info` or `hpat bench-check`
 #   - GPIB address : set on the e-load front panel
 #   - FT232H serial: `python -c "import ftd2xx; print(ftd2xx.listDevices())"`
+#
+# SCPI source of truth: docs/instruments/processed/ (never raw/).
 
 simulation: false
 
@@ -13,17 +15,19 @@ instruments:
     resource: "ASRL3::INSTR"
     options:
       channel: 1
-      max_voltage_v: 32.0
-      max_current_a: 3.0
+      baud_rate: 9600
+      max_voltage_v: 30.0      # CH1/CH2 rated 0-30 V
+      max_current_a: 3.0       # CH1/CH2 rated 3 A
 
   eload:
-    driver: eload_3315d
+    driver: prodigit_3315g
     resource: "GPIB0::5::INSTR"
     options:
+      module: 3315G            # 3315G: 15 A / 60 V / 75 W (3311G: 60 A / 300 W)
       gpib_address: 5
-      max_voltage_v: 120.0
-      max_current_a: 20.0
-      max_power_w: 300.0
+      max_voltage_v: 60.0
+      max_current_a: 15.0
+      max_power_w: 75.0
 
   scope:
     driver: tektronix_tbs2204b
@@ -36,6 +40,8 @@ instruments:
     resource: "USB0::0x1AB1::0x0C94::DM00000000::INSTR"
     options: {}
 
+  # Keithley 2100: current processed doc only covers calibration commands.
+  # Keep the role configured but expect a driver warning until docs are updated.
   dmm_vout:
     driver: dmm_keithley2000
     resource: "USB0::0x05E6::0x2000::0000000::INSTR"
@@ -55,8 +61,8 @@ instruments:
 
 safety:
   max_voltage_v: 12.0
-  max_current_a: 20.0
-  max_power_w: 240.0
+  max_current_a: 15.0          # limited by the 3315G module
+  max_power_w: 75.0            # limited by the 3315G module
   settle_ms_default: 200
   power_up_order: [psu, eload]
   power_down_order: [eload, psu]

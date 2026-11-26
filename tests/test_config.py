@@ -15,7 +15,7 @@ instruments:
     resource: "ASRL3::INSTR"
     options: {channel: 1}
   eload:
-    driver: eload_3315d
+    driver: prodigit_3315g
     resource: "GPIB0::5::INSTR"
   scope:
     driver: tektronix_tbs2204b

@@ -36,8 +36,10 @@
 - Commit / push khi chưa được yêu cầu.
 - Hard-code địa chỉ VISA, GPIB address, hay địa chỉ register PMIC trong code test item
   (phải qua `config/instruments.yaml` hoặc file plan).
-- Viết/sửa driver khi chưa đọc tài liệu tương ứng trong `docs/instruments/processed/`
-  (hoặc `raw/` nếu chưa xử lý); lệnh mới dùng phải được ghi lại vào `processed/`.
+- Viết/sửa driver khi chưa đọc tài liệu tương ứng trong `docs/instruments/processed/`.
+  **`processed/` là nguồn chuẩn duy nhất** cho lệnh SCPI; không lấy lệnh từ `raw/` hay nguồn ngoài.
+  Tuân thủ `docs/instruments/ate_scpi_command_extraction.md`; lệnh mới dùng phải được ghi lại vào
+  `processed/` kèm page reference. Lệnh chưa có tài liệu → dừng và yêu cầu bổ sung, không tự bịa.
 - Bỏ qua bước tắt output khi thiết kế luồng lỗi.
 
 ## Git
